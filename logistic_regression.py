@@ -5,6 +5,10 @@ import numpy as np
 # Linear Model is:    InterestRate = b + a1(FICOScore) + a2(LoanAmount)
 #     in our program: InterestRate = y + x1(FICOScore) + x2(LoanAmount)
 
+def logistic_function(FICOScore,LoanAmount,coeff):
+	p = 1/(1+math.exp(coeff[0]+coeff[2]*FICOScore+coeff[1]*LoanAmount))
+	return p
+
 # Data source
 loansData = pd.read_csv('https://spark-public.s3.amazonaws.com/dataanalysis/loansData.csv')
 
@@ -23,6 +27,7 @@ ind_vars = ['FICO.Score', 'Amount.Requested', 'Intercept']
 # http://blog.yhat.com/posts/logistic-regression-and-python.html
 logit = sm.Logit(loansData['IR_TF'], loansData[ind_vars])
 result = logit.fit()
+print result.summary()
 coeff = result.params
 
 loansData.to_csv('loansData_clean.csv', header=True, index=False)
