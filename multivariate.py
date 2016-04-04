@@ -3,6 +3,6 @@ import statsmodels.api as sm
 import numpy as np
 
 # Data source
-df = pd.read_csv('curric-data-001-data-sets/loans/loansData.csv')
+df = pd.read_csv('loansData_multivariate.csv')
 
 print df.head()
