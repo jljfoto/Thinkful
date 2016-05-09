@@ -9,6 +9,7 @@ import collections
 from dateutil.parser import parse 
 from pandas.io.json import json_normalize
 import pandas as pd
+import numpy as np
 
 API_KEY='2d98d7a43da74022adcee263c990a208'
 
@@ -24,23 +25,25 @@ city_airports={"San Francisco": '37.6188056,-122.3754167',
                "Kona International": '19.7387658,-156.0456314',
                "San Carlos": '37.5118549,-122.2495235'}
 
+city_airports={"San Francisco": '37.6188056,-122.3754167',
+	       "Detroit Metro": '42.2124167,-83.3533889'}
 
 con = lite.connect('weather.db')
 cur = con.cursor()
 
-with con:
-    cur.execute('CREATE TABLE IF NOT EXISTS city_airport_reference (count INT, city TEXT, time  INT, temperature INT, UNIQUE (count, city,time,temperature))')
+#with con:
+#    cur.execute('CREATE TABLE IF NOT EXISTS city_airport_reference (count INT, city TEXT, time  INT, temperature INT, UNIQUE (count, city,time,temperature))')
 
 with con:
-    cur.execute('CREATE TABLE IF NOT EXISTS city_airport_max (count INT, city TEXT, time  INT, max_temp INT, min_temp INT, mean INT, median INT, range INT, UNIQUE (count, city,time,max_temp, range))')
+    cur.execute('CREATE TABLE IF NOT EXISTS city_airport_max (count INT, city TEXT, time  INT, max_temp INT, min_temp INT, mean INT, median INT, range INT, hourly_temps TEXT, hourly_times TEXT, UNIQUE (count, city,time,max_temp, range))')
 
-sql = "INSERT INTO city_airport_reference (count, city, time, temperature) VALUES (?,?,?,?)"
-sql2 = "INSERT INTO city_airport_max (count, city, time, max_temp, min_temp, mean, median, range) VALUES (?,?,?,?,?,?,?,?)"
+#sql = "INSERT INTO city_airport_reference (count, city, time, temperature) VALUES (?,?,?,?)"
+sql2 = "INSERT INTO city_airport_max (count, city, time, max_temp, min_temp, mean, median, range,hourly_temps, hourly_times) VALUES (?,?,?,?,?,?,?,?,?,?)"
 
 count = 0
 for k,v in city_airports.items():
     print "Airport: {}  Coord: {}  Time: {} ".format(k,v, cur_time)
-    for day in range(30):
+    for day in range(2):
         start_time=(datetime.datetime.now() - datetime.timedelta(days=day)).strftime("%Y-%m-%dT%T")
         #print "start_time: {}   type: {}\n".format(start_time,type(start_time))
         req_str='https://api.forecast.io/forecast/'+API_KEY+'/'+v+','+str(start_time)
@@ -49,54 +52,29 @@ for k,v in city_airports.items():
 	df = json_normalize(r.json())
 	#print "{}\n".format(df.columns)
         max = 0
-        min = 0
+        min = 300
 	for i in df['hourly.data'][0]:
-            count = count + 1
-	    #print count, k, dt.fromtimestamp(i['time']).strftime('%Y-%m-%d %T'), i['temperature']
-            with con:
-	        cur.execute(sql,(count, k, dt.fromtimestamp(i['time']).strftime('%Y-%m-%d %T'),i['temperature']))
+            #with con:
+	    #     cur.execute(sql,(count, k, dt.fromtimestamp(i['time']).strftime('%Y-%m-%d %T'),i['temperature']))
 
-            if i['temperature'] > max:
-               max = i['temperature']
+            temp_list = []
+            for i in df['hourly.data'][0]: temp_list.append(i['temperature'])
 
-            if i['temperature'] < min:
-               min = i['temperature']
-        
-        mean=0
-        median=0
+            hour_list = []
+            for i in df['hourly.data'][0]: hour_list.append(i['time'])
+
+            for tt in temp_list:
+                if tt > max:
+                   max = tt
+                if tt < min:
+                   min = tt
+
+        count = count + 1
         with con:
-	    cur.execute(sql2,(count, k, dt.fromtimestamp(i['time']).strftime('%Y-%m-%d %T'),max,min,mean,median,(max-min)))
+	     cur.execute(sql2,(count, k, dt.fromtimestamp(i['time']).strftime('%Y-%m-%d %T'),max,min,np.mean(temp_list),np.median(temp_list),abs(max-min),str(temp_list).strip('[]'),str(hour_list).strip('[]')))
 
+        print count, k, dt.fromtimestamp(i['time']).strftime('%Y-%m-%d %T'), max, min, np.mean(temp_list), np.median(temp_list), abs(max-min), temp_list, hour_list
+        
 con.close()
 
 exit()
-
-#extract the column from the DataFrame and put them into a list
-station_ids = df['id'].tolist() 
-
-#add the '_' to the station name and also add the data type for SQLite
-station_ids = ['_' + str(x) + ' INT' for x in station_ids]
-
-#create the table
-#in this case, we're concatenating the string and joining all the station ids (now with '_' and 'INT' added)
-with con:
-    cur.execute("CREATE TABLE available_bikes ( execution_time INT, " +  ", ".join(station_ids) + ");")
-
-#take the string and parse it into a Python datetime object
-exec_time = parse(r.json()['executionTime'])
-
-with con:
-    cur.execute('INSERT INTO available_bikes (execution_time) VALUES (?)', (exec_time.strftime('%s'),))
-
-id_bikes = collections.defaultdict(int) #defaultdict to store available bikes by station
-
-#loop through the stations in the station list
-for station in r.json()['stationBeanList']:
-    id_bikes[station['id']] = station['availableBikes']
-
-#iterate through the defaultdict to update the values in the database
-with con:
-    for k, v in id_bikes.iteritems():
-	cur.execute("UPDATE available_bikes SET _" + str(k) + " = " + str(v) + " WHERE execution_time = " + exec_time.strftime('%s') + ";")
-
-
