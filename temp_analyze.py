@@ -20,16 +20,19 @@ def keywithmaxval(d):
     return max(d, key=lambda k: d[k])
 
 df = pd.read_sql_query("SELECT * FROM city_airport_max ORDER BY count",con,index_col='time')
+
+df['new_index'] = df['count'].str()
 #print df.columns
 
-#print df.head()
+print df['new_index'].head()
+exit()
 
 max_range=0
 max_city=0
 max_day=''
 temps=''
 times=''
-for i in df.index:
+for i in df['new_index']:
 #    if df['range'][i] > max_range:
 #       max_range=df['range'][i]
 #       max_city=df['city'][i]
