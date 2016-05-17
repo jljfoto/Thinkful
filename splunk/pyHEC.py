@@ -39,7 +39,7 @@ class PyHEC:
 	#print "self.token: |{}|".format(self.token)
 	#print "payload: |{}|".format(json.dumps(payload))
 	#print "metadata: |{}|".format(metadata)
-	#print "headers: |{}|".format(headers)
+	print "headers: |{}|".format(headers)
 	#print "self.port: |{}|\n".format(self.port)
 
         #print "data... {}".format(json.dumps(payload))
